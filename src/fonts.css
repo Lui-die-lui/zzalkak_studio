@@ -1,0 +1,42 @@
+/*
+ * 제목/소제목/본문에서 선택할 수 있는 글꼴 모음.
+ * family 이름은 src/lib/fonts.ts의 FONT_OPTIONS와 정확히 일치해야 한다.
+ * (CSS 규칙상 @import는 반드시 다른 규칙보다 먼저, 연속으로 와야 한다)
+ */
+
+/* 기본 글꼴: Pretendard */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
+
+/* 도트/픽셀: 갈무리 (Galmuri11/Galmuri9 등 여러 패밀리를 함께 제공) */
+@import url("https://cdn.jsdelivr.net/npm/galmuri@latest/dist/galmuri.css");
+
+/* 도트 텍스트: Mona (한글 텍스트 포함 버전) */
+@import url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/mona.css");
+
+/* Google Fonts 한글 디스플레이/손글씨 모음 */
+@import url("https://fonts.googleapis.com/css2?family=Jua&family=Do+Hyeon&family=Nanum+Pen+Script&family=Poor+Story&family=Gamja+Flower&display=swap");
+
+/* 손글씨: 그리운연우 */
+@font-face {
+  font-family: "NostalgicDesertYeonwoo";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2508-2@1.0/Griun_YEONWOO-Rg.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 레트로 픽셀: 네오둥근모 */
+@font-face {
+  font-family: "NeoDonggeunmo";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.3/NeoDunggeunmo.woff") format("woff");
+  font-weight: normal;
+  font-display: swap;
+}
+
+/* 제목용 고딕: 원스토어 모바일 고딕 타이틀 */
+@font-face {
+  font-family: "OneStoreMobileGothicTitleFont";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/ONE-Mobile-Title.woff") format("woff");
+  font-weight: normal;
+  font-display: swap;
+}

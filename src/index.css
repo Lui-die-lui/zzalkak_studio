@@ -1,0 +1,20 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "NanumGothic", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  background: #f3f4f7;
+  color: #1f2328;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}

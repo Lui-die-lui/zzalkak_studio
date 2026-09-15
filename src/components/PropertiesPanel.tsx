@@ -18,6 +18,7 @@ import { FONT_SIZE_MAX, FONT_SIZE_MIN, LINE_HEIGHT_MAX, LINE_HEIGHT_MIN, STICKER
 import { buildFontStack, FONT_OPTIONS } from "../lib/fonts";
 import { getStickerAsset, stickerSrc } from "../lib/stickers";
 import { TEXT_BLOCK_KEYS, TEXT_BLOCK_LABELS, type StickerInstance, type TextAlign, type TextBlockKey } from "../lib/types";
+import { GradientOverlayControls } from "./GradientOverlayControls";
 
 interface PropertiesPanelProps {
   editor: EditorApi;
@@ -338,6 +339,38 @@ function BackgroundProperties({ editor }: { editor: EditorApi }) {
   const { image, settings } = editor;
   const type = settings.background.type;
 
+  // 왼쪽 "이미지" 도구 패널이 이미 열려 있으면 업로드·그라데이션 등 같은 컨트롤을 여기서 또 보여주지 않는다.
+  if (editor.activeTool === "image") {
+    return (
+      <div style={{ marginTop: 4 }}>
+        <p className="field-hint">배경 편집 도구가 왼쪽에 열려 있습니다. 이미지 업로드·배경 종류·그라데이션 필터는 그 패널에서 바꿀 수 있어요.</p>
+        <div className="kv" style={{ marginTop: 10 }}>
+          <div className="kv__row">
+            <span className="kv__key">배경 종류</span>
+            <span className="kv__val">
+              {type === "color" ? (
+                <span className="color-row" style={{ justifyContent: "flex-end" }}>
+                  <span className="color-swatch" style={{ backgroundColor: settings.background.color }} aria-hidden="true" />
+                  단색 ({settings.background.color.toUpperCase()})
+                </span>
+              ) : image ? (
+                image.fileName
+              ) : (
+                "이미지 없음"
+              )}
+            </span>
+          </div>
+          {type === "image" && image && (
+            <div className="kv__row"><span className="kv__key">출력 크기</span><span className="kv__val">{editor.outputSize.width} × {editor.outputSize.height}px</span></div>
+          )}
+        </div>
+        <button type="button" className="btn btn--ghost btn--sm" style={{ marginTop: 10 }} onClick={() => editor.openTool(null)}>
+          여기서 바로 편집하기
+        </button>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="segmented segmented--full" role="radiogroup" aria-label="배경 종류">
@@ -401,6 +434,8 @@ function BackgroundProperties({ editor }: { editor: EditorApi }) {
           </button>
         </div>
       )}
+
+      <GradientOverlayControls editor={editor} idPrefix="background-properties" />
     </>
   );
 }

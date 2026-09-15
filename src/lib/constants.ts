@@ -1,5 +1,5 @@
 import { DEFAULT_FONT_ID } from "./fonts";
-import type { CardSettings, OutputSize, Ratio, TextBlockSettings } from "./types";
+import type { CardSettings, GradientOverlaySettings, OutputSize, Ratio, TextBlockSettings } from "./types";
 
 /** 화면비별 출력 크기(px). 코드 전역에서 이 값만 참조한다. */
 export const OUTPUT_SIZES: Record<Ratio, OutputSize> = {
@@ -32,8 +32,16 @@ function block(text: string, fontSize: number): TextBlockSettings {
 /** 사용자가 단색 배경으로 처음 전환할 때 기본으로 채워주는 색상 */
 export const DEFAULT_BACKGROUND_COLOR = "#3b5bfd";
 
+export const DEFAULT_GRADIENT_OVERLAY: GradientOverlaySettings = {
+  enabled: false,
+  direction: "top",
+  color: "#ffffff",
+  opacity: 0.78,
+};
+
 export const DEFAULT_CARD_SETTINGS: CardSettings = {
   background: { type: "image", color: DEFAULT_BACKGROUND_COLOR },
+  gradientOverlay: DEFAULT_GRADIENT_OVERLAY,
   title: block("", 92),
   subtitle: block("", 52),
   body: block("여기에 문구를 입력하세요", 44),

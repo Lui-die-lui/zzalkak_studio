@@ -1,6 +1,7 @@
 import {
   DEFAULT_BACKGROUND_COLOR,
   DEFAULT_CARD_SETTINGS,
+  DEFAULT_GRADIENT_OVERLAY,
   DEFAULT_LINE_HEIGHT,
   DRAFT_STORAGE_KEY,
   LINE_HEIGHT_MAX,
@@ -17,6 +18,8 @@ import type {
   BackgroundSettings,
   BackgroundType,
   CardSettings,
+  GradientDirection,
+  GradientOverlaySettings,
   Ratio,
   StickerInstance,
   Template,
@@ -29,7 +32,7 @@ import type {
 
 /**
  * v1(단일 text/fontSize/color) → v2(title/subtitle/body) → v3(align, lineHeight,
- * stickers) → v4(background) 순서로 누락된 항목을 채운다. 검증 전에만
+ * stickers) → v4(background) → v5(gradientOverlay) 순서로 누락된 항목을 채운다. 검증 전에만
  * 사용하며, 값의 타입 검증은 validateSingleTemplate이 담당한다.
  */
 function normalizeShape(raw: unknown): unknown {
@@ -63,6 +66,11 @@ function normalizeShape(raw: unknown): unknown {
   // v3 → v4: 배경 설정이 없으면 "이미지 배경"(예전 동작 그대로)으로 채운다.
   if (obj.background === undefined) {
     obj.background = { type: "image", color: DEFAULT_BACKGROUND_COLOR };
+  }
+
+  // v4 → v5: 기존 카드에는 그라데이션 필터를 끈 상태로 추가한다.
+  if (obj.gradientOverlay === undefined) {
+    obj.gradientOverlay = { ...DEFAULT_GRADIENT_OVERLAY };
   }
 
   return obj;
@@ -197,6 +205,22 @@ function validateBackground(value: unknown, where: string): string | BackgroundS
   return { type: obj.type, color: obj.color };
 }
 
+function isValidGradientDirection(value: unknown): value is GradientDirection {
+  return value === "top" || value === "bottom" || value === "left" || value === "right";
+}
+
+function validateGradientOverlay(value: unknown, where: string): string | GradientOverlaySettings {
+  if (typeof value !== "object" || value === null) return `${where} 값이 객체가 아닙니다.`;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.enabled !== "boolean") return `${where}.enabled 값이 true/false가 아닙니다.`;
+  if (!isValidGradientDirection(obj.direction)) return `${where}.direction 값이 top, bottom, left, right 중 하나가 아닙니다.`;
+  if (!isValidHexColor(obj.color)) return `${where}.color 값이 올바른 색상 코드(#rrggbb)가 아닙니다.`;
+  if (typeof obj.opacity !== "number" || !Number.isFinite(obj.opacity) || obj.opacity < 0 || obj.opacity > 1) {
+    return `${where}.opacity 값이 0~1 사이의 숫자가 아닙니다.`;
+  }
+  return { enabled: obj.enabled, direction: obj.direction, color: obj.color, opacity: obj.opacity };
+}
+
 /** 제목/소제목/본문 블록 하나의 스키마를 검증한다. */
 function validateTextBlock(value: unknown, where: string): string | TextBlockSettings {
   if (typeof value !== "object" || value === null) {
@@ -251,6 +275,8 @@ export function validateCardSettings(raw: unknown, prefix = ""): string | CardSe
 
   const background = validateBackground(obj.background, `${prefix}"background"`);
   if (typeof background === "string") return background;
+  const gradientOverlay = validateGradientOverlay(obj.gradientOverlay, `${prefix}"gradientOverlay"`);
+  if (typeof gradientOverlay === "string") return gradientOverlay;
 
   const blocks: Partial<Record<(typeof TEXT_BLOCK_KEYS)[number], TextBlockSettings>> = {};
   for (const key of TEXT_BLOCK_KEYS) {
@@ -276,6 +302,7 @@ export function validateCardSettings(raw: unknown, prefix = ""): string | CardSe
 
   return {
     background,
+    gradientOverlay,
     title: blocks.title!,
     subtitle: blocks.subtitle!,
     body: blocks.body!,

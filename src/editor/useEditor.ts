@@ -28,6 +28,7 @@ import {
 import type {
   BackgroundSettings,
   CardSettings,
+  GradientOverlaySettings,
   Ratio,
   Selection,
   StickerInstance,
@@ -225,6 +226,14 @@ export function useEditor() {
   const setBackground = useCallback(
     (partial: Partial<BackgroundSettings>, options?: ApplyOptions) => {
       apply((prev) => ({ ...prev, background: { ...prev.background, ...partial } }), options);
+    },
+    [apply],
+  );
+
+  /** 배경과 콘텐츠 사이에 놓이는 투명 그라데이션 필터를 변경한다. */
+  const setGradientOverlay = useCallback(
+    (partial: Partial<GradientOverlaySettings>, options?: ApplyOptions) => {
+      apply((prev) => ({ ...prev, gradientOverlay: { ...prev.gradientOverlay, ...partial } }), options);
     },
     [apply],
   );
@@ -486,6 +495,7 @@ export function useEditor() {
     clearTextBlock,
     setRatio,
     setBackground,
+    setGradientOverlay,
     setTextPosition,
     canDownload,
     undo: history.undo,

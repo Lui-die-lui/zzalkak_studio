@@ -1,10 +1,10 @@
 import { ImagePlus, Maximize2, Minus, PaintBucket, Plus, RotateCw } from "lucide-react";
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import type { EditorApi } from "../editor/useEditor";
-import { ZOOM_MAX, ZOOM_MIN } from "../lib/constants";
+import { TEXT_MAX_WIDTH_RATIO, ZOOM_MAX, ZOOM_MIN } from "../lib/constants";
 import { ensureFontsLoaded } from "../lib/fontLoader";
 import { getFontOption } from "../lib/fonts";
-import { drawCard, type DrawResult } from "../lib/render";
+import { drawCard, type BlockLayout, type DrawResult } from "../lib/render";
 import { ensureStickersLoaded, getStickerAsset } from "../lib/stickers";
 import { TEXT_BLOCK_KEYS, TEXT_BLOCK_LABELS } from "../lib/types";
 
@@ -16,7 +16,7 @@ const STAGE_PADDING = 40;
 
 type DragMode =
   | { kind: "none" }
-  | { kind: "move-text"; startX: number; startY: number; originX: number; originY: number }
+  | { kind: "move-text"; key: (typeof TEXT_BLOCK_KEYS)[number]; startX: number; startY: number; originX: number; originY: number; moved: boolean }
   | { kind: "move-sticker"; id: string; startX: number; startY: number; originX: number; originY: number }
   | { kind: "resize-sticker"; id: string; cx: number; cy: number; startDist: number; originWidth: number }
   | { kind: "rotate-sticker"; id: string; cx: number; cy: number; startAngle: number; originRotation: number };
@@ -43,6 +43,8 @@ export function Stage({ editor }: StageProps) {
   const [layout, setLayout] = useState<DrawResult | null>(null);
   const [fitScale, setFitScale] = useState(0.4);
   const [dragOver, setDragOver] = useState(false);
+  const [inlineEdit, setInlineEdit] = useState<{ key: (typeof TEXT_BLOCK_KEYS)[number]; value: string; layout: BlockLayout; width: number } | null>(null);
+  const inlineEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const dragRef = useRef<DragMode>({ kind: "none" });
 
   const displayScale = fitScale * zoom;
@@ -50,6 +52,23 @@ export function Stage({ editor }: StageProps) {
   const frameHeight = outputSize.height * displayScale;
   // 단색 배경 모드면 사진이 없어도 캔버스를 그릴 수 있다.
   const canRender = settings.background.type === "color" || Boolean(image);
+
+  useEffect(() => {
+    if (!inlineEdit) return;
+    const editorElement = inlineEditorRef.current;
+    if (!editorElement) return;
+    editorElement.focus();
+    editorElement.select();
+    editorElement.style.height = "0px";
+    editorElement.style.height = `${Math.max(inlineEdit.layout.height * displayScale + 8, editorElement.scrollHeight)}px`;
+  }, [inlineEdit?.key]);
+
+  useLayoutEffect(() => {
+    if (!inlineEdit || !inlineEditorRef.current) return;
+    const editorElement = inlineEditorRef.current;
+    editorElement.style.height = "0px";
+    editorElement.style.height = `${Math.max(inlineEdit.layout.height * displayScale + 8, editorElement.scrollHeight)}px`;
+  }, [displayScale, inlineEdit]);
 
   // ---------- 캔버스가 작업 영역에 맞도록 기본 배율 계산 ----------
   useLayoutEffect(() => {
@@ -67,7 +86,7 @@ export function Stage({ editor }: StageProps) {
   }, [outputSize]);
 
   // ---------- 그리기 (다운로드와 완전히 같은 drawCard) ----------
-  const paintNow = () => {
+  const paintNow = (hiddenTextKey: (typeof TEXT_BLOCK_KEYS)[number] | null = inlineEdit?.key ?? null) => {
     const canvas = canvasRef.current;
     if (!canvas || !canRender) return;
     const ctx = canvas.getContext("2d");
@@ -91,6 +110,7 @@ export function Stage({ editor }: StageProps) {
       settings,
       outputSize,
       stickerImages,
+      { hiddenTextKey },
     );
     layoutRef.current = result;
     setLayout(result);
@@ -113,14 +133,14 @@ export function Stage({ editor }: StageProps) {
       getCanvas: () => canvasRef.current,
       ensureFreshPaint: async () => {
         await prepareAssets();
-        paintNow();
+        paintNow(null);
         // 새 글꼴로 처음 그릴 때 드물게 발생하는 글자 외곽선 깨짐을 방지하기 위해 한 프레임 뒤 한 번 더 그린다.
         await waitTwoFrames();
-        paintNow();
+        paintNow(null);
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [image, settings, outputSize],
+    [image, settings, outputSize, inlineEdit?.key],
   );
 
   useEffect(() => {
@@ -141,7 +161,7 @@ export function Stage({ editor }: StageProps) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canRender, image, settings, outputSize]);
+  }, [canRender, image, settings, outputSize, inlineEdit?.key]);
 
   // ---------- 좌표 변환 ----------
   const toCanvasPoint = (clientX: number, clientY: number) => {
@@ -197,10 +217,12 @@ export function Stage({ editor }: StageProps) {
       editor.select({ kind: "text", key: hit.key });
       dragRef.current = {
         kind: "move-text",
+        key: hit.key,
         startX: point.x,
         startY: point.y,
         originX: settings.xPercent,
         originY: settings.yPercent,
+        moved: false,
       };
     }
     frameRef.current?.setPointerCapture(e.pointerId);
@@ -237,6 +259,9 @@ export function Stage({ editor }: StageProps) {
     if (!point) return;
 
     if (drag.kind === "move-text") {
+      const moved = drag.moved || Math.hypot(point.x - drag.startX, point.y - drag.startY) * displayScale >= 4;
+      if (!moved) return;
+      if (!drag.moved) dragRef.current = { ...drag, moved: true };
       const dx = ((point.x - drag.startX) / outputSize.width) * 100;
       const dy = ((point.y - drag.startY) / outputSize.height) * 100;
       editor.setTextPosition(drag.originX + dx, drag.originY + dy, { coalesceKey: "drag-text" });
@@ -262,12 +287,47 @@ export function Stage({ editor }: StageProps) {
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
     dragRef.current = { kind: "none" };
     try {
       frameRef.current?.releasePointerCapture(e.pointerId);
     } catch {
       // 캡처되지 않은 상태에서 release 시도 시 무시
     }
+    if (drag.kind === "move-text" && !drag.moved) {
+      const blockLayout = layoutRef.current?.blocks.find((block) => block.key === drag.key);
+      if (blockLayout) setInlineEdit({ key: drag.key, value: settings[drag.key].text, layout: blockLayout, width: blockLayout.width });
+    }
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    dragRef.current = { kind: "none" };
+    try {
+      frameRef.current?.releasePointerCapture(e.pointerId);
+    } catch {
+      // 캡처되지 않은 상태에서 release 시도 시 무시
+    }
+  };
+
+  const commitInlineEdit = () => {
+    if (!inlineEdit) return;
+    if (inlineEdit.value !== settings[inlineEdit.key].text) {
+      editor.patchBlock(inlineEdit.key, { text: inlineEdit.value });
+    }
+    setInlineEdit(null);
+  };
+
+  const updateInlineEdit = (value: string) => {
+    if (!inlineEdit) return;
+    const ctx = canvasRef.current?.getContext("2d");
+    let width = inlineEdit.layout.width;
+    if (ctx) {
+      ctx.save();
+      ctx.font = `bold ${inlineEdit.layout.fontSize}px ${inlineEdit.layout.fontStack}`;
+      width = value.split("\n").reduce((max, line) => Math.max(max, ctx.measureText(line || " ").width), 0);
+      ctx.restore();
+    }
+    setInlineEdit({ ...inlineEdit, value, width });
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -300,6 +360,21 @@ export function Stage({ editor }: StageProps) {
   const selectedStickerAsset = selectedStickerLayout ? getStickerAsset(selectedStickerLayout.stickerId) : null;
 
   const zoomPercent = Math.round(displayScale * 100);
+  const inlineEditorFrame = inlineEdit
+    ? (() => {
+        const center = (settings.xPercent / 100) * outputSize.width * displayScale;
+        const maxWidth = outputSize.width * TEXT_MAX_WIDTH_RATIO * displayScale;
+        const width = Math.min(maxWidth, Math.max(inlineEdit.width * displayScale + 12, 72));
+        let left = center - width / 2;
+        if (inlineEdit.layout.align === "left") left = center - maxWidth / 2 - 7;
+        if (inlineEdit.layout.align === "right") left = center + maxWidth / 2 - width + 7;
+        return {
+          left,
+          top: (inlineEdit.layout.top - inlineEdit.layout.lineHeight / 2) * displayScale - 2,
+          width,
+        };
+      })()
+    : null;
 
   return (
     <div
@@ -319,7 +394,7 @@ export function Stage({ editor }: StageProps) {
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
           >
             <canvas
               ref={canvasRef}
@@ -331,8 +406,8 @@ export function Stage({ editor }: StageProps) {
             />
 
             {/* 선택 가이드는 DOM 오버레이로만 그린다 — 캔버스 픽셀(다운로드 결과)에는 포함되지 않는다 */}
-            <div className="stage-overlay" aria-hidden="true">
-              {selectedBlockLayout && (
+            <div className="stage-overlay">
+              {selectedBlockLayout && !inlineEdit && (
                 <div
                   className="guide guide--text"
                   style={{
@@ -372,6 +447,40 @@ export function Stage({ editor }: StageProps) {
                     aria-label="스티커 크기 조절"
                     title="드래그해서 크기 조절"
                     onPointerDown={(e) => startResize(e, selectedStickerLayout.id)}
+                  />
+                </div>
+              )}
+              {inlineEdit && inlineEditorFrame && (
+                <div className="inline-text-editor-frame" style={inlineEditorFrame}>
+                  <span className="guide__label inline-text-editor__label">{TEXT_BLOCK_LABELS[inlineEdit.key]}</span>
+                  <textarea
+                    ref={inlineEditorRef}
+                    className="inline-text-editor"
+                    value={inlineEdit.value}
+                    aria-label={`${TEXT_BLOCK_LABELS[inlineEdit.key]} 문구 바로 편집`}
+                    title="바깥을 클릭하거나 Ctrl/⌘+Enter를 누르면 적용됩니다. Esc를 누르면 취소됩니다."
+                    spellCheck={false}
+                    wrap="soft"
+                    style={{
+                      height: Math.max(inlineEdit.layout.height * displayScale + 8, 34),
+                      fontFamily: inlineEdit.layout.fontStack,
+                      fontSize: inlineEdit.layout.fontSize * displayScale,
+                      lineHeight: `${inlineEdit.layout.lineHeight * displayScale}px`,
+                      color: inlineEdit.layout.color,
+                      textAlign: inlineEdit.layout.align,
+                    }}
+                    onChange={(e) => updateInlineEdit(e.target.value)}
+                    onBlur={commitInlineEdit}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setInlineEdit(null);
+                      } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      }
+                    }}
                   />
                 </div>
               )}

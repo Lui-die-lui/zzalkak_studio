@@ -162,6 +162,41 @@ export function computeStickerLayout(sticker: StickerInstance, canvas: OutputSiz
   };
 }
 
+/** 선택한 가장자리의 색이 안쪽으로 갈수록 투명해지는 오버레이를 그린다. */
+function drawGradientOverlay(ctx: CanvasRenderingContext2D, settings: CardSettings, canvas: OutputSize): void {
+  const overlay = settings.gradientOverlay;
+  if (!overlay.enabled || overlay.opacity <= 0) return;
+
+  const normalizedColor = overlay.color.length === 4
+    ? `#${overlay.color[1]}${overlay.color[1]}${overlay.color[2]}${overlay.color[2]}${overlay.color[3]}${overlay.color[3]}`
+    : overlay.color;
+  const red = Number.parseInt(normalizedColor.slice(1, 3), 16);
+  const green = Number.parseInt(normalizedColor.slice(3, 5), 16);
+  const blue = Number.parseInt(normalizedColor.slice(5, 7), 16);
+
+  const fadeRatio = 0.68;
+  let gradient: CanvasGradient;
+  if (overlay.direction === "top") {
+    gradient = ctx.createLinearGradient(0, 0, 0, canvas.height * fadeRatio);
+  } else if (overlay.direction === "bottom") {
+    gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height * (1 - fadeRatio));
+  } else if (overlay.direction === "left") {
+    gradient = ctx.createLinearGradient(0, 0, canvas.width * fadeRatio, 0);
+  } else {
+    gradient = ctx.createLinearGradient(canvas.width, 0, canvas.width * (1 - fadeRatio), 0);
+  }
+
+  gradient.addColorStop(0, overlay.color);
+  gradient.addColorStop(0.16, overlay.color);
+  gradient.addColorStop(1, `rgba(${red}, ${green}, ${blue}, 0)`);
+
+  ctx.save();
+  ctx.globalAlpha = overlay.opacity;
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+}
+
 /**
  * 미리보기(canvas)와 다운로드(canvas)가 공통으로 사용하는 유일한 렌더링
  * 함수. 그리는 순서: 배경(사진 cover 배치 또는 단색 채우기) → 스티커(배열
@@ -180,6 +215,7 @@ export function drawCard(
   settings: CardSettings,
   canvas: OutputSize,
   stickerImages: Map<string, HTMLImageElement>,
+  options?: { hiddenTextKey?: TextBlockKey | null },
 ): DrawResult {
   ctx.save();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -194,6 +230,9 @@ export function drawCard(
     ctx.drawImage(image, dx, dy, dWidth, dHeight);
   }
   ctx.restore();
+
+  // 필터는 바탕 그림 위, 스티커와 텍스트 아래에 놓인다.
+  drawGradientOverlay(ctx, settings, canvas);
 
   // ---------- 스티커 ----------
   const stickerLayouts: StickerLayout[] = [];
@@ -283,6 +322,7 @@ export function drawCard(
   }
 
   for (const layout of layouts) {
+    if (layout.key === options?.hiddenTextKey) continue;
     ctx.font = `bold ${layout.fontSize}px ${layout.fontStack}`;
     ctx.fillStyle = layout.color;
     ctx.textAlign = layout.align;

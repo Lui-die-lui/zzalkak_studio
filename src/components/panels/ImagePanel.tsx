@@ -1,5 +1,6 @@
 import { Image as ImageIcon, PaintBucket, Replace, Trash2, Upload } from "lucide-react";
 import type { EditorApi } from "../../editor/useEditor";
+import { GradientOverlayControls } from "../GradientOverlayControls";
 import { Message } from "../Message";
 
 export function ImagePanel({ editor }: { editor: EditorApi }) {
@@ -72,6 +73,8 @@ export function ImagePanel({ editor }: { editor: EditorApi }) {
           {editor.uploadError && <Message kind="error">{editor.uploadError}</Message>}
         </div>
       )}
+
+      <GradientOverlayControls editor={editor} idPrefix="image-panel" />
     </div>
   );
 }

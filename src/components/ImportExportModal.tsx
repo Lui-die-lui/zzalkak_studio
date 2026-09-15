@@ -1,4 +1,4 @@
-import { Download, Upload } from "lucide-react";
+import { Download, FileJson, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import type { EditorApi } from "../editor/useEditor";
 import { exportTemplatesFile, mergeImportedTemplates, validateImportData } from "../lib/templates";
@@ -11,15 +11,20 @@ interface ImportExportModalProps {
 
 export function ImportExportModal({ editor }: ImportExportModalProps) {
   const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [importDone, setImportDone] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { templates } = editor;
 
   const close = () => {
     editor.setIoModalOpen(false);
     setMessage(null);
+    setSelectedFileName(null);
+    setImportDone(false);
   };
 
   const handleExport = () => {
+    setImportDone(false);
     if (templates.length === 0) {
       setMessage({ kind: "error", text: "내보낼 템플릿이 없습니다. 먼저 템플릿을 저장해 주세요." });
       return;
@@ -36,12 +41,14 @@ export function ImportExportModal({ editor }: ImportExportModalProps) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setImportDone(false);
     setMessage({ kind: "success", text: `템플릿 ${templates.length}개를 JSON 파일로 내보냈습니다.` });
     editor.showToast("success", `템플릿 ${templates.length}개를 내보냈습니다.`);
   };
 
   const handleImportFile = async (file: File) => {
     setMessage(null);
+    setImportDone(false);
     let text: string;
     try {
       text = await file.text();
@@ -78,6 +85,7 @@ export function ImportExportModal({ editor }: ImportExportModalProps) {
       renamed > 0 ? ` ID가 겹친 ${renamed}개는 새 이름으로 추가되었습니다.` : ""
     }`;
     setMessage({ kind: "success", text: summary });
+    setImportDone(true);
     editor.showToast("success", `${imported}개 템플릿을 가져왔습니다.`);
   };
 
@@ -100,20 +108,35 @@ export function ImportExportModal({ editor }: ImportExportModalProps) {
           같은 ID의 템플릿이 이미 있으면 기존 것을 덮어쓰지 않고 새 항목으로 추가됩니다.
         </p>
         <label htmlFor="template-import-input" className="field__label">JSON 파일 선택</label>
-        <input
-          ref={fileInputRef}
-          id="template-import-input"
-          type="file"
-          accept="application/json,.json"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void handleImportFile(file);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-          }}
-        />
+        <div className="file-picker">
+          <button type="button" className="btn btn--secondary" onClick={() => fileInputRef.current?.click()}>
+            <FileJson size={15} /> 파일 선택
+          </button>
+          <span className="file-picker__name">{selectedFileName ?? "선택된 파일 없음"}</span>
+          <input
+            ref={fileInputRef}
+            id="template-import-input"
+            type="file"
+            accept="application/json,.json"
+            className="visually-hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setSelectedFileName(file.name);
+                void handleImportFile(file);
+              }
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          />
+        </div>
       </section>
 
       {message && <Message kind={message.kind}>{message.text}</Message>}
+      {importDone && (
+        <button type="button" className="btn btn--primary btn--block" style={{ marginTop: 12 }} onClick={close}>
+          확인하고 닫기
+        </button>
+      )}
     </Modal>
   );
 }

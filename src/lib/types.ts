@@ -14,6 +14,18 @@ export type TextAlign = "left" | "center" | "right";
 
 export type BackgroundType = "image" | "color";
 
+export type GradientDirection = "top" | "bottom" | "left" | "right";
+
+/** 배경 위, 스티커·문구 아래에 그리는 가장자리 그라데이션 필터 */
+export interface GradientOverlaySettings {
+  enabled: boolean;
+  /** 선택한 가장자리에서 안쪽으로 갈수록 투명해진다. */
+  direction: GradientDirection;
+  color: string;
+  /** 가장자리 색상의 불투명도(0~1) */
+  opacity: number;
+}
+
 /** 카드 배경: 사진(cover 배치) 또는 단색 중 하나 */
 export interface BackgroundSettings {
   type: BackgroundType;
@@ -58,6 +70,7 @@ export interface StickerInstance {
 /** 편집 중인 카드 한 장의 상태값 (이미지 원본은 포함하지 않음) */
 export interface CardSettings {
   background: BackgroundSettings;
+  gradientOverlay: GradientOverlaySettings;
   title: TextBlockSettings;
   subtitle: TextBlockSettings;
   body: TextBlockSettings;
@@ -78,7 +91,7 @@ export interface Template extends CardSettings {
   updatedAt: string;
 }
 
-export const TEMPLATE_SCHEMA_VERSION = 4;
+export const TEMPLATE_SCHEMA_VERSION = 5;
 
 export interface TemplateExportFile {
   version: number;
